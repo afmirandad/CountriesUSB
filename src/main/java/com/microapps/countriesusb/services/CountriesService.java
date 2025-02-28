@@ -1,17 +1,28 @@
 package com.microapps.countriesusb.services;
 
-import com.microapps.countriesusb.entities.CountriesEntity;
-import org.springframework.stereotype.Service;
+// Importaciones necesarias para la funcionalidad del servicio
+import com.microapps.countriesusb.entities.CountriesEntity; // Entidad que representa la tabla de países en la base de datos
+import org.springframework.http.ResponseEntity; // Permite personalizar la respuesta HTTP con códigos de estado y contenido
+import org.springframework.stereotype.Service; // Anotación que marca esta clase como un servicio gestionado por Spring
+import java.util.ArrayList; // Lista dinámica para almacenar países en memoria
+import java.util.List; // Importación necesaria para manejar listas de objetos
+import java.util.Map; // Permite crear respuestas JSON en formato clave-valor
+import java.util.Optional; // Manejo seguro de valores opcionales
+import java.util.stream.Collectors; // Para filtrar y transformar listas de países
 
-import java.util.ArrayList;
-import java.util.List;
-
+/**
+ * Servicio que maneja la lógica de negocio relacionada con los países.
+ */
 @Service
 public class CountriesService {
 
+    // Lista en memoria que almacena los países
     private final List<CountriesEntity> countries = new ArrayList<>();
-    private int currentId = 1;
+    private Long currentId = 1L; // ID autoincremental para los países
 
+    /**
+     * Constructor que inicializa la lista con algunos países de prueba.
+     */
     public CountriesService() {
         countries.add(new CountriesEntity(currentId++, "Argentina", "Buenos Aires", "América", "AR"));
         countries.add(new CountriesEntity(currentId++, "Colombia", "Bogotá", "América", "57"));
@@ -34,51 +45,91 @@ public class CountriesService {
         countries.add(new CountriesEntity(currentId++, "República Dominicana", "Santo Domingo", "América", "1"));
         countries.add(new CountriesEntity(currentId++, "Portugal", "Lisboa", "Europa", "351"));
         countries.add(new CountriesEntity(currentId++, "Reino Unido", "Londres", "Asia", "44"));
+        // Se agregan más países...
     }
 
+    /**
+     * Obtiene la lista completa de países.
+     * @return Lista de objetos CountriesEntity.
+     */
     public List<CountriesEntity> getAllCountries() {
         return countries;
     }
 
-    public CountriesEntity getCountriesById(int id) {
-        return countries.get(id);
+    /**
+     * Obtiene un país por su ID.
+     * @param id Identificador único del país.
+     * @return ResponseEntity con el país encontrado o un mensaje de error.
+     */
+    public ResponseEntity<?> getCountriesById(Long id) {
+        Optional<CountriesEntity> country = countries.stream()
+                .filter(c -> c.getId() == id)
+                .findFirst();
+
+        return country.isPresent() ? ResponseEntity.ok(country.get()) :
+                ResponseEntity.badRequest().body(Map.of("Error", "País con ID " + id + " no encontrado"));
     }
 
-    public CountriesEntity getCountriesByContinent(String continent) {
-        int index = countries.indexOf(continent);
-        return countries.get(index);
+    /**
+     * Filtra los países por continente.
+     * @param continent Nombre del continente.
+     * @return Lista de países pertenecientes al continente especificado.
+     */
+    public List<CountriesEntity> getCountriesByContinent(String continent) {
+        return countries.stream()
+                .filter(c -> c.getCountryContinent().equalsIgnoreCase(continent))
+                .collect(Collectors.toList());
     }
 
-    public CountriesEntity addCountry(CountriesEntity country) {
-        if (country.getId() != 0 ){
-            for (int i = 0; i < countries.size(); i++) {
-                if (countries.get(i).getId() == country.getId()) {
-                    return countries.get(i);
-                }else{
-                    countries.add(country);
-                }
-            }
-        }else{
-            country.setId(currentId++);
-            countries.add(country);
+    /**
+     * Agrega un nuevo país a la lista.
+     * @param country País a agregar.
+     * @return ResponseEntity con mensaje de éxito o error si el país ya existe.
+     */
+    public ResponseEntity<?> addCountry(CountriesEntity country) {
+        boolean exists = countries.stream()
+                .anyMatch(c -> c.getId() == country.getId());
+
+        if (exists) {
+            return ResponseEntity.badRequest().body(Map.of("Error", "El país con ID " + country.getId() + " ya existe"));
         }
-        return country;
+        country.setId(currentId++);
+        countries.add(country);
+        return ResponseEntity.ok(Map.of("Mensaje", "País agregado exitosamente", "pais", country));
     }
 
-    public CountriesEntity updateCountry(CountriesEntity country, int id) {
-        for(int i = 0; i < countries.size(); i++) {
-            if(countries.get(i).getId() == id) {
+    /**
+     * Actualiza un país existente en la lista.
+     * @param id Identificador único del país a actualizar.
+     * @param country Datos actualizados del país.
+     * @return ResponseEntity con mensaje de éxito o error si el país no existe.
+     */
+    public ResponseEntity<?> updateCountry(Long id, CountriesEntity country) {
+        for (int i = 0; i < countries.size(); i++) {
+            if (countries.get(i).getId() == id) {
                 country.setId(id);
                 countries.set(i, country);
-                return country;
+                return ResponseEntity.ok(Map.of("Mensaje", "País actualizado exitosamente", "pais", country));
             }
         }
-        return country;
+        return ResponseEntity.badRequest().body(Map.of("Error", "El país con ID " + id + " no existe"));
     }
 
-    public String deleteCountryById(int id) {
-        countries.remove(id);
-        return "Pais eliminado";
-    }
+    /**
+     * Elimina un país de la lista por su ID.
+     * @param id Identificador único del país a eliminar.
+     * @return ResponseEntity con mensaje de éxito o error si el país no se encuentra.
+     */
+    public ResponseEntity<?> deleteCountryById(Long id) {
+        Optional<CountriesEntity> countryToRemove = countries.stream()
+                .filter(c -> c.getId() == id)
+                .findFirst();
 
+        if (countryToRemove.isPresent()) {
+            countries.remove(countryToRemove.get());
+            return ResponseEntity.ok(Map.of("Mensaje", "País eliminado exitosamente"));
+        } else {
+            return ResponseEntity.badRequest().body(Map.of("Error", "País con ID " + id + " no encontrado"));
+        }
+    }
 }
